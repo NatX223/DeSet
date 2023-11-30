@@ -1,0 +1,12 @@
+{
+  "name": "deset",
+  "version": "1.0.0",
+  "description": "A derivative of the DeForm project but more focused on data set curation and off-chain and on-chain data streaming with chainlink.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

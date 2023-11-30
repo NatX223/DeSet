@@ -1,15 +1,17 @@
 {
-  "name": "deset",
-  "version": "1.0.0",
-  "description": "A derivative of the DeForm project but more focused on data set curation and off-chain and on-chain data streaming with chainlink.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "name": "hardhat-project",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "hardhat": "^2.17.2"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@chainlink/contracts": "^0.8.0"
+    "@chainlink/contracts": "^0.8.0",
+    "@openzeppelin/contracts": "^4.9.3",
+    "@tableland/evm": "^4.3.0",
+    "@tableland/sdk": "^4.5.1",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.7.1",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.16.0"
   }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "@tableland/evm/contracts/utils/TablelandDeployments.sol";
 import "@tableland/evm/contracts/utils/SQLHelpers.sol";
@@ -47,17 +47,6 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
     // Router address - Hardcoded for Mumbai
     address router = 0x6E2dc0F9DB014aE19888F539E59285D2Ea04244C;
 
-    string source =
-    "const characterId = args[0];"
-    "const apiResponse = await Functions.makeHttpRequest({"
-    "url: `https://swapi.dev/api/people/${characterId}/`"
-    "});"
-    "if (apiResponse.error) {"
-    "throw Error('Request failed');"
-    "}"
-    "const { data } = apiResponse;"
-    "return Functions.encodeString(data.name);";
-
     //Callback gas limit
     uint32 gasLimit = 300000;
 
@@ -69,7 +58,6 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
     // State variable to store the returned character information
     string public character;
 
-    address public owner;
     address public controllerContract;
     address public marketAddress;
 
@@ -103,11 +91,16 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
     // mapping of ids to writeString
     mapping (uint256 => string) writeQueries;
 
+    // the API/Datasource mapping
+    mapping (uint256 => string[]) sources;
+
+    // upkeep time mapping
+    mapping (uint256 => uint256) timeFrame; 
+
     // mapping to check if a filling a table is rewarded with an NFT
     mapping (uint256 => bool) mintable;
 
     constructor(address _routerContract, address _controllerContract, address registryAddress, address _marketPlace) ERC1155("hash") FunctionsClient(router) ConfirmedOwner(msg.sender) {
-        owner = msg.sender;
         routerContract = RouterContract(_routerContract);
         controllerContract = _controllerContract;
         Tableland = IERC721(registryAddress);
@@ -166,7 +159,7 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
     // function to create a table
     // try creating the table first then
     // setting the access controller to the contract
-    function createTable(string memory tablePrefix, string memory createString, string memory description, string memory writeQuery) public onlyOwner {
+    function createDataset(string memory tablePrefix, string memory createString, string memory description, string memory writeQuery, string[] memory apiSources) public onlyOwner {
 
         uint256 id = TablelandDeployments.get().create( // creating a table ID
             address(this), // setting it's owner to the address for easy write access
@@ -185,10 +178,11 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
         Tables[_tableCount.current()].tableId = _tableCount.current();
         Tables[_tableCount.current()].tablelandId = id;
         Tables[_tableCount.current()].tableName = tableName;
-        
+
         TablelandDeployments.get().setController(address(this), id, controllerContract);
         
         writeQueries[_tableCount.current()] = writeQuery;
+        sources[_tableCount.current()] = apiSources;
         
         routerContract.addTable(msg.sender, tablePrefix, address(this), _tableCount.current());
         _tableCount.increment();
@@ -205,48 +199,50 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
 
     // function to write to a table
     // implements tableland access control function for fees
-    function writeTable(uint256 id, string[] memory responses) public payable {
-          string memory response = concatWriteArray(responses);
-          string memory writeQuery = writeQueries[id];
-        //   check for native rewards
-          if (address(this).balance > tableReward[id].singleAmount && tableReward[id].totalAmount > 0) {
-          TablelandDeployments.get().mutate{value:msg.value}(
-            address(this),
-            Tables[id].tablelandId,
-            SQLHelpers.toInsert(
-            Tables[id].tablePrefix,
-            Tables[id].tablelandId,
-            string.concat("id,", writeQuery),
-            string.concat(
-            Strings.toString(Tables[id].responseCount), // Convert to a string
-            ",",
-            response
-            )
-            )
-        );
+    // make into a function
+    // automate process
+    // function writeTable(uint256 id, ) public payable {
+    //       string memory response = concatWriteArray(responses);
+    //       string memory writeQuery = writeQueries[id];
+    //     //   check for native rewards
+    //       if (address(this).balance > tableReward[id].singleAmount && tableReward[id].totalAmount > 0) {
+    //       TablelandDeployments.get().mutate{value:msg.value}(
+    //         address(this),
+    //         Tables[id].tablelandId,
+    //         SQLHelpers.toInsert(
+    //         Tables[id].tablePrefix,
+    //         Tables[id].tablelandId,
+    //         string.concat("id,", writeQuery),
+    //         string.concat(
+    //         Strings.toString(Tables[id].responseCount), // Convert to a string
+    //         ",",
+    //         response
+    //         )
+    //         )
+    //     );
 
-        (bool sent, bytes memory data) = payable(msg.sender).call{value: msg.value}("");
-        require(sent, "Failed to send Ether");
-        Tables[id].responseCount += 1;
-          } else {
-            TablelandDeployments.get().mutate{value:msg.value}(
-            address(this),
-            Tables[id].tablelandId,
-            SQLHelpers.toInsert(
-            Tables[id].tablePrefix,
-            Tables[id].tablelandId,
-            string.concat("id,", writeQuery),
-            string.concat(
-            Strings.toString(Tables[id].responseCount), // Convert to a string
-            ",",
-            response
-            )
-            )
-        );
-        Tables[id].responseCount += 1;
-        }
+    //     (bool sent, bytes memory data) = payable(msg.sender).call{value: msg.value}("");
+    //     require(sent, "Failed to send Ether");
+    //     Tables[id].responseCount += 1;
+    //       } else {
+    //         TablelandDeployments.get().mutate{value:msg.value}(
+    //         address(this),
+    //         Tables[id].tablelandId,
+    //         SQLHelpers.toInsert(
+    //         Tables[id].tablePrefix,
+    //         Tables[id].tablelandId,
+    //         string.concat("id,", writeQuery),
+    //         string.concat(
+    //         Strings.toString(Tables[id].responseCount), // Convert to a string
+    //         ",",
+    //         response
+    //         )
+    //         )
+    //     );
+    //     Tables[id].responseCount += 1;
+    //     }
 
-    }
+    // }
 
     function getCount() public view returns(uint256) {
         return _tableCount.current();
@@ -296,10 +292,5 @@ contract userTables is ERC721Holder, ERC1155, FunctionsClient, ConfirmedOwner {
 
     // implement addFee function
     // prolly do that with tableland access control
-
-    modifier onlyOwner {
-        require(msg.sender == owner);
-        _;
-    }
 }
 
